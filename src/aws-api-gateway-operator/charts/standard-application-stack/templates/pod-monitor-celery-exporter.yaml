@@ -1,0 +1,10 @@
+{{- if (ne .Values.global.clusterEnv "local") }}
+{{- if (and .Values.celery .Values.celery.enabled) }}
+{{- if (and .Values.redis .Values.redis.enabled) }}
+{{- if (and .Values.celery.metrics .Values.celery.metrics.enabled) }}
+{{- $monitorData := dict "Release" .Release "Chart" .Chart "Values" .Values "component" "celery-exporter" "config" .Values.celery.metrics "type" "Pod" }}
+{{ include "mintel_common.monitor" $monitorData }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

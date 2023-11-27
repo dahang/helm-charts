@@ -1,0 +1,8 @@
+# Create namespace for our apps
+apiVersion: v1
+kind: Namespace
+metadata:
+  # Namespace name
+  name: {{ .Values.global.env}}-{{ .Values.global.app.name}}
+  labels:
+    istio-injection: enabled

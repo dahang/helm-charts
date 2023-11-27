@@ -1,0 +1,16 @@
+annotations:
+  artifacthub.io/changes: |
+    - kind: Fixed
+      description: Fixed selector labels
+apiVersion: v2
+appVersion: 0.0.1
+description: A common Helm chart for Spring boot application
+keywords:
+- spring
+- spring boot
+name: spring-boot-microservice
+sources:
+- https://spring.io/projects/spring-boot
+- https://github.com/olehrgf/helm-charts
+type: application
+version: 1.0.5

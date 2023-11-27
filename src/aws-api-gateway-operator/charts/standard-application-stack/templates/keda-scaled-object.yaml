@@ -1,0 +1,77 @@
+{{- if .Values.autoscaling.enabled }}
+{{- if (ne .Values.global.clusterEnv "local") }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "mintel_common.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "mintel_common.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.autoscaling }}
+  cooldownPeriod: {{ include "mintel_common.keda.scaledObject.cooldownPeriod" .}}
+  maxReplicaCount: {{ include "mintel_common.keda.scaledObject.maxReplicaCount" .}}
+  minReplicaCount: {{ include "mintel_common.keda.scaledObject.minReplicaCount" .}}
+  {{- if .enableZeroReplicas }}
+  idleReplicaCount: 0
+  {{- end }}
+  pollingInterval: {{ include "mintel_common.keda.scaledObject.pollingInterval" .}}
+  scaleTargetRef:
+    apiVersion: {{ .scaleTargetRef.apiVersion }}
+    {{- if $.Values.statefulset }}
+    kind: StatefulSet
+    {{- else }}
+    kind: {{ .scaleTargetRef.kind }}
+    {{- end }}
+    name: {{ include "mintel_common.fullname" $ }}
+    {{- if .scaleTargetRef.envSourceContainerName }}
+    envSourceContainerName: {{ .scaleTargetRef.envSourceContainerName }}
+    {{- end }}
+  advanced:
+    {{- toYaml .advanced | nindent 4 }}
+  fallback:
+    failureThreshold: {{ .fallback.failureThreshold }}
+    replicas: {{ .fallback.replicas }}
+  {{- with .triggers }}
+  triggers:
+  {{- if .targetCPUUtilizationPercentage }}
+  - type: cpu
+    metricType: Utilization
+    metadata:
+      value: "{{ .targetCPUUtilizationPercentage }}"
+  {{- else if .targetCPUAverageValue }}
+  - type: cpu
+    metricType: AverageValue
+    metadata:
+      value: "{{ .targetCPUAverageValue }}"
+  {{- end }}
+  {{- if .targetMemoryUtilizationPercentage }}
+  - type: memory
+    metricType: Utilization
+    metadata:
+      value: "{{ .targetMemoryUtilizationPercentage }}"
+  {{- else if .targetMemoryAverageValue }}
+  - type: memory
+    metricType: AverageValue
+    metadata:
+      value: "{{ .targetMemoryAverageValue }}"
+  {{- end }}
+  {{- range .custom  }}
+  - type: {{ .type }}
+    metadata:
+    {{- if and (not (hasKey .metadata  "serverAddress")) (eq "prometheus" .type) }}
+      serverAddress: 'http://prometheus-k8s.monitoring.svc:9090'
+    {{- end }}
+    {{- if and (not (hasKey .metadata  "identityOwner")) (hasPrefix "aws-" .type) }}
+      identityOwner: 'operator'
+    {{- end }}
+    {{- if and (not (hasKey .metadata  "awsRegion")) (hasPrefix "aws-" .type) }}
+      awsRegion: {{ $.Values.global.clusterRegion }}
+    {{- end }}
+    {{- range $k, $v := .metadata }}
+      {{ $k }}: "{{ $v }}"
+  {{- end }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

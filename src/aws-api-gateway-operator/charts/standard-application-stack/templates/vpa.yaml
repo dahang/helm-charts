@@ -1,0 +1,54 @@
+{{- if .Values.verticalPodAutoscaler.enabled }}
+
+{{- if (ne .Values.global.clusterEnv "local") }}
+
+{{- if (eq .Values.cronjobsOnly false) }}
+---
+apiVersion: {{ include "common.capabilities.verticalPodAutoscaler.apiVersion" . }}
+kind: VerticalPodAutoscaler
+metadata:
+{{- if .Values.statefulset }}
+  name: statefulset-{{ include "mintel_common.fullname" . }}
+{{ else }}
+  name: deployment-{{ include "mintel_common.fullname" . }}
+{{ end }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{ include "mintel_common.commonAnnotations" . | nindent 4 }}
+  labels: {{ include "mintel_common.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    apiVersion: apps/v1
+{{- if .Values.statefulset }}
+    kind: StatefulSet
+{{ else }}
+    kind: Deployment
+{{ end }}
+    name: {{ include "mintel_common.fullname" . }}
+  updatePolicy:
+    updateMode: "Off"
+{{- end }}
+
+{{- range .Values.cronjobs.jobs }}
+{{- $data := dict "Release" $.Release "Chart" $.Chart "Values" $.Values "component" .name }}
+---
+apiVersion: {{ include "common.capabilities.verticalPodAutoscaler.apiVersion" . }}
+kind: VerticalPodAutoscaler
+metadata:
+  name: cronjob-{{ include "mintel_common.fullname" $data }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    {{ include "mintel_common.commonAnnotations" $data | nindent 4 }}
+  labels: {{ include "mintel_common.labels" $data | nindent 4 }}
+spec:
+  targetRef:
+    apiVersion: batch/v1
+    kind: CronJob
+    name: {{ include "mintel_common.fullname" $data }}
+  updatePolicy:
+    updateMode: "Off"
+{{- end }}
+
+{{- end }}
+
+{{- end }}

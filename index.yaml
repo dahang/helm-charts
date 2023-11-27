@@ -1,0 +1,121 @@
+apiVersion: v1
+entries:
+  aws-api-gateway-operator:
+  - apiVersion: v2
+    appVersion: v1.0.2
+    created: "2023-11-26T21:36:08.160137-05:00"
+    dependencies:
+    - condition: standard-application-stack.enabled
+      name: standard-application-stack
+      repository: https://mintel.github.io/helm-charts
+      version: 3.58.0
+    description: AWS API Gateway Operator Helm chart for Kubernetes
+    digest: cb7c1620a18adc916da8d227ba98a7a32e067af5e76df0e26e1897cf7ad8ad37
+    keywords:
+    - eks
+    - aws
+    - api gateway
+    name: aws-api-gateway-operator
+    type: application
+    urls:
+    - src/aws-api-gateway-operator-0.1.2.tgz
+    version: 0.1.2
+  java-service:
+  - apiVersion: v2
+    appVersion: v1.0
+    created: "2023-11-26T21:36:08.160453-05:00"
+    description: Helm chart for Spring Boot application with logging and tracing
+    digest: fa0e7962689d2dd66617ce0e438fe507ce7fa136bb2e4158776002ee0cf680ed
+    home: https://github.com/Romanow/helm-charts/tree/master/charts/java-service
+    icon: https://raw.githubusercontent.com/Romanow/helm-charts/master/icons/spring-boot.png
+    keywords:
+    - spring boot
+    - java
+    - kotlin
+    maintainers:
+    - email: romanowalex@mail.ru
+      name: Romanov Alexey
+      url: https://romanow.github.io
+    name: java-service
+    sources:
+    - https://spring.io/projects/spring-boot
+    - https://hub.docker.com/_/amazoncorretto
+    type: application
+    urls:
+    - src/java-service-1.5.1.tgz
+    version: 1.5.1
+  postgresql:
+  - annotations:
+      category: Database
+      images: |
+        - name: os-shell
+          image: docker.io/bitnami/os-shell:11-debian-11-r91
+        - name: postgres-exporter
+          image: docker.io/bitnami/postgres-exporter:0.15.0-debian-11-r2
+        - name: postgresql
+          image: docker.io/bitnami/postgresql:16.1.0-debian-11-r9
+      licenses: Apache-2.0
+    apiVersion: v2
+    appVersion: 16.1.0
+    created: "2023-11-26T21:36:08.163089-05:00"
+    dependencies:
+    - name: common
+      repository: oci://registry-1.docker.io/bitnamicharts
+      tags:
+      - bitnami-common
+      version: 2.x.x
+    description: PostgreSQL (Postgres) is an open source object-relational database
+      known for reliability and data integrity. ACID-compliant, it supports foreign
+      keys, joins, views, triggers and stored procedures.
+    digest: 184dc0e3fb9e993c8f3ab9a4312dd0bb00af44516e01a1e48a7d5d33f67d3b4a
+    home: https://bitnami.com
+    icon: https://bitnami.com/assets/stacks/postgresql/img/postgresql-stack-220x234.png
+    keywords:
+    - postgresql
+    - postgres
+    - database
+    - sql
+    - replication
+    - cluster
+    maintainers:
+    - name: VMware, Inc.
+      url: https://github.com/bitnami/charts
+    name: postgresql
+    sources:
+    - https://github.com/bitnami/charts/tree/main/bitnami/postgresql
+    urls:
+    - src/postgresql-13.2.16.tgz
+    version: 13.2.16
+  spring-boot-microservice:
+  - annotations:
+      artifacthub.io/changes: |
+        - kind: Fixed
+          description: Fixed selector labels
+    apiVersion: v2
+    appVersion: 0.0.1
+    created: "2023-11-26T21:36:08.163459-05:00"
+    description: A common Helm chart for Spring boot application
+    digest: 78e9458c5561e8067c90235aff037f1e7b96c078ebb0bd1ed1e0e9bbf4e4a7e5
+    keywords:
+    - spring
+    - spring boot
+    name: spring-boot-microservice
+    sources:
+    - https://spring.io/projects/spring-boot
+    - https://github.com/olehrgf/helm-charts
+    type: application
+    urls:
+    - src/spring-boot-microservice-1.0.5.tgz
+    version: 1.0.5
+  web:
+  - apiVersion: v2
+    appVersion: 1.3.0
+    created: "2023-11-26T21:36:08.163695-05:00"
+    description: A simple web application using Istio and Ingress-nginx
+    digest: 610778cf90f27f682516bd9f561a9dbd33266b15437382566d1e89066649ff84
+    name: web
+    type: application
+    urls:
+    - src/web-0.4.1.tgz
+    version: 0.4.1
+generated: "2023-11-26T21:36:08.145336-05:00"

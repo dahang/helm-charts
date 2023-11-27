@@ -1,0 +1,196 @@
+{{- if (and .Values.celery .Values.celery.enabled) }}
+{{- if (and .Values.celeryBeat .Values.celeryBeat.enabled) }}
+{{- $data := dict "Release" .Release "Chart" .Chart "Values" .Values "component" "celery-beat" }}
+apiVersion: {{ include "common.capabilities.deployment.apiVersion" . }}
+kind: Deployment
+metadata:
+  name: {{ include "mintel_common.fullname" $data }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- include "mintel_common.commonAnnotations" . | nindent 4 }}
+    {{- if (and .Values.celeryBeat.liveness (not .Values.celeryBeat.liveness.enabled)) }}
+    app.mintel.com/opa-skip-liveness-probe-check.main: "true"
+    {{- end }}
+    {{- if (and .Values.celeryBeat.readiness (not .Values.celeryBeat.readiness.enabled)) }}
+    app.mintel.com/opa-skip-readiness-probe-check.main: "true"
+    {{- end }}
+    {{- $secretListStr := (include "mintel_common.secretList" .) }}
+    {{- with $secretListStr }}
+    secret.reloader.stakater.com/reload: {{ . }}
+    {{- end }}
+    {{- $configmapListStr := (include "mintel_common.configmapList" .) }}
+    {{- with $configmapListStr }}
+    configmap.reloader.stakater.com/reload: {{ . }}
+    {{- end }}
+    app.mintel.com/opa-allow-single-replica: "true"
+  labels: {{ include "mintel_common.labels" $data | nindent 4 }}
+spec:
+  {{- with .Values.minReadySeconds }}
+  minReadySeconds: {{ . }}
+  {{- end }}
+  replicas: 1
+  selector:
+    matchLabels: {{ include "mintel_common.selectorLabels" $data | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels: {{ include "mintel_common.labels" $data | nindent 8 }}
+    spec:
+      {{- include "mintel_common.imagePullSecrets" . | nindent 6 }}
+      {{- with .Values.podSecurityContext }}
+      securityContext: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if (and .Values.serviceAccount (or .Values.serviceAccount.create .Values.serviceAccount.name)) }}
+      serviceAccountName: {{ .Values.serviceAccount.name | default (include "mintel_common.fullname" .) }}
+      {{- end }}
+      containers:
+        - name: main
+          image: {{ .Values.celeryBeat.image | default (include "mintel_common.image" .) }}
+          imagePullPolicy: {{ include "mintel_common.imagePullPolicy" . }}
+          {{- with .Values.celeryBeat.command | default .Values.command }}
+          command: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.celeryBeat.args | default .Values.args }}
+          args: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: KUBERNETES_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- include "mintel_common.localDevEnv" . | nindent 12 }}
+            {{- include "mintel_common.defaultEnv" . | nindent 12 }}
+            {{- include "mintel_common.redisEnv" . | nindent 12 }}
+            {{- include "mintel_common.mailhogEnv" . | nindent 12 }}
+            {{- include "mintel_common.elasticsearchEnv" . | nindent 12 }}
+            {{- include "mintel_common.opensearchEnv" . | nindent 12 }}
+            {{- include "mintel_common.localstackEnv" . | nindent 12 }}
+            {{- include "mintel_common.eventBusEnv" . | nindent 12 }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .Values.celeryBeat.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          envFrom:
+            {{- if (and .Values.externalSecret .Values.externalSecret.enabled) }}
+            {{- if (or (ne .Values.global.clusterEnv "local") (and (eq .Values.global.clusterEnv "local") .Values.externalSecret.localValues)) }}
+            - secretRef:
+                name: {{ .Values.externalSecret.nameOverride | default (include "mintel_common.defaultAppSecretName" .) }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.global.terraform.externalSecrets }}
+              {{- range include "mintel_common.tf_cloud_external_secrets" . | split "," }}
+              {{- if . }}
+            - secretRef:
+                name: {{ . }}
+              {{- end }}
+              {{- end }}
+            {{- else }}
+            {{- if (and .Values.mariadb .Values.mariadb.enabled) }}
+            - secretRef:
+                name: {{ .Values.mariadb.secretNameOverride | default (include "mintel_common.defaultMariadbSecretName" .) }}
+            {{- end }}
+            {{- if (and .Values.postgresql .Values.postgresql.enabled) }}
+            - secretRef:
+                name: {{ .Values.postgresql.secretNameOverride | default (include "mintel_common.defaultPostgresqlSecretName" .) }}
+            {{- end }}
+            {{- if (and .Values.redis .Values.redis.enabled) }}
+            - secretRef:
+                name: {{ .Values.redis.secretNameOverride | default (include "mintel_common.defaultRedisSecretName" .) }}
+            {{- end }}
+            {{- if (and .Values.elasticsearch .Values.elasticsearch.enabled) }}
+            - secretRef:
+                name: {{ .Values.elasticsearch.secretNameOverride | default (include "mintel_common.defaultElasticsearchSecretName" .) }}
+            {{- end }}
+            {{- if (and .Values.opensearch .Values.opensearch.enabled) }}
+            - secretRef:
+                name: {{ .Values.opensearch.secretNameOverride | default (include "mintel_common.defaultOpensearchSecretName" .) }}
+            {{- end }}
+            {{- if (and .Values.s3 .Values.s3.enabled) }}
+            - secretRef:
+                name: {{ .Values.s3.secretNameOverride | default (include "mintel_common.defaultS3SecretName" .) }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: {{ .Values.port }}
+              name: http
+          {{- if (and .Values.celeryBeat.liveness .Values.celeryBeat.liveness.enabled) }}
+          livenessProbe:
+            {{- if .Values.celeryBeat.liveness.methodOverride }}
+            {{- toYaml .Values.celeryBeat.liveness.methodOverride | nindent 12 }}
+            {{- else }}
+            httpGet:
+              path: {{ .Values.liveness.path | default "/healthz" }}
+              port: {{ .Values.liveness.port | default "http" }}
+              scheme: {{ .Values.liveness.scheme | default "HTTP" }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.celeryBeat.liveness.initialDelaySeconds | default 0 }}
+            timeoutSeconds: {{ .Values.celeryBeat.liveness.timeoutSeconds | default 1 }}
+            periodSeconds: {{ .Values.celeryBeat.liveness.periodSeconds | default 10 }}
+          startupProbe:
+            {{- if .Values.celeryBeat.liveness.methodOverride }}
+            {{- toYaml .Values.celeryBeat.liveness.methodOverride | nindent 12 }}
+            {{- else }}
+            httpGet:
+              path: {{ .Values.liveness.path | default "/healthz" }}
+              port: {{ .Values.liveness.port | default "http" }}
+              scheme: {{ .Values.liveness.scheme | default "HTTP" }}
+            {{- end }}
+            {{- if .Values.celeryBeat.liveness.startup }}
+            {{- if .Values.celeryBeat.liveness.startup.failureThreshold }}
+            failureThreshold: {{ .Values.celeryBeat.liveness.startup.failureThreshold }}
+            {{- else }}
+            failureThreshold: 60
+            {{- end }}
+            {{- if .Values.celeryBeat.liveness.startup.periodSeconds }}
+            periodSeconds: {{ .Values.celeryBeat.liveness.startup.periodSeconds }}
+            {{- else }}
+            periodSeconds: 5
+            {{- end }}
+            {{- else }}
+            failureThresold: 60
+            periodSeconds: 5
+            {{- end }}
+          {{- end }}
+          {{- if (and .Values.celeryBeat.readiness .Values.celeryBeat.readiness.enabled) }}
+          readinessProbe:
+            {{- if .Values.celeryBeat.readiness.methodOverride }}
+            {{- toYaml .Values.celeryBeat.readiness.methodOverride | nindent 12 }}
+            {{- else }}
+            httpGet:
+              path: {{ .Values.readiness.path | default "/readiness" }}
+              port: {{ .Values.readiness.port | default "http" }}
+              scheme: {{ .Values.readiness.scheme | default "HTTP" }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.celeryBeat.readiness.initialDelaySeconds | default 0 }}
+            timeoutSeconds: {{ .Values.celeryBeat.readiness.timeoutSeconds | default 1 }}
+            periodSeconds: {{ .Values.celeryBeat.readiness.periodSeconds | default 10 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.celeryBeat.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if (or .Values.volumeMounts .Values.celeryBeat.volumeMounts) }}
+          volumeMounts:
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .Values.celeryBeat.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      {{- if .Values.volumes }}
+      volumes:
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}

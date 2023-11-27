@@ -1,0 +1,39 @@
+{{- if (and .Values.service .Values.service.enabled) }}
+{{- if (eq .Values.cronjobsOnly false) }}
+{{- if (ne .Values.global.clusterEnv "local") }}
+{{- if (and .Values.metrics .Values.metrics.enabled) }}
+{{- $config := .Values.metrics | deepCopy }}
+{{- $_ := set $config "port" ( printf "main-%s" (.Values.metrics.port | default "http")) }}
+{{- $monitorData := dict "Release" .Release "Chart" .Chart "Values" .Values "component" .name "config" $config "type" "Service" }}
+---
+{{ include "mintel_common.monitor" $monitorData }}
+
+{{- range .Values.metrics.additionalMonitors }}
+{{- $config := . }}
+{{- if not $config.port }}
+{{- $_ := set $config "port" ( printf "main-%s" .name ) }}
+{{- end }}
+{{- $monitorData := dict "Release" $.Release "Chart" $.Chart "Values" $.Values "component" .name "config" . "type" "Service" }}
+---
+{{ include "mintel_common.monitor" $monitorData }}
+{{- end }}
+{{- end }}
+
+{{- if (and .Values.oauthProxy .Values.oauthProxy.enabled) }}
+{{- $config := dict "port" "auth-proxy-metrics" }}
+{{- $monitorData := dict "Release" $.Release "Chart" $.Chart "Values" $.Values "component" "oauth-metrics" "config" $config "type" "Service" }}
+---
+{{ include "mintel_common.monitor" $monitorData }}
+{{- end }}
+
+{{- if (and .Values.filebeatSidecar .Values.filebeatSidecar.enabled) }}
+{{- if (and .Values.filebeatSidecar.metrics .Values.filebeatSidecar.metrics.enabled) }}
+{{- $config := dict "port" "beat-exporter-metrics" }}
+{{- $filebeatData := dict "Release" .Release "Chart" .Chart "Values" .Values "component" "filebeat"  "config" $config "type" "Service" }}
+---
+{{ include "mintel_common.monitor" $filebeatData }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

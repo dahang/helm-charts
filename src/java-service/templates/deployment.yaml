@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/component: application
+    app.kubernetes.io/managed-by: helm
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "{{ .Values.metrics.enabled }}"
+        prometheus.io/path: "{{ .Values.metrics.path }}"
+        prometheus.io/port: "{{ .Values.ports.internal }}"
+      labels:
+        app: {{ .Release.Name }}
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/component: application
+        app.kubernetes.io/managed-by: helm
+    spec:
+      {{- if .Values.initContainers }}
+      initContainers:
+      {{- tpl (toYaml .Values.initContainers) . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            requests:
+              memory: "{{ .Values.resources.requests.memory }}"
+              cpu: "{{ .Values.resources.requests.cpu }}"
+            limits:
+              memory: "{{ .Values.resources.limits.memory }}"
+              cpu: "{{ .Values.resources.limits.cpu }}"
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.profile }}"
+            - name: JAVA_TOOL_OPTIONS
+              value: "{{ printf "-XX:MaxRAMPercentage=%.1f %s" .Values.memoryUsage (.Values.javaOptions | default "") }}"
+            {{- if .Values.database.name }}
+            - name: DATABASE_NAME
+              value: "{{ .Values.database.name }}"
+            {{- end }}
+            - name: DATABASE_HOST
+              value: "{{ .Values.database.host }}"
+            - name: DATABASE_PORT
+              value: "{{ .Values.database.port }}"
+            - name: DATABASE_USER
+              value: "{{ .Values.database.username }}"
+            - name: DATABASE_PASSWORD
+              value: "{{ .Values.database.password }}"
+            - name: CIRCUIT_BREAKER_ENABLED
+              value: "{{ .Values.circuitBreaker.enabled }}"
+            {{- if .Values.tracing.enabled }}
+            - name: TRACING_ENABLED
+              value: "{{ .Values.tracing.enabled }}"
+            {{- if .Values.tracing.endpoint }}
+            - name: TRACING_COLLECTOR_ENDPOINT
+              value: "{{ .Values.tracing.endpoint }}"
+            {{- end }}
+            {{- end }}
+            {{- range $env := .Values.environments }}
+            - name: {{ $env.name }}
+              value: "{{ $env.value }}"
+            {{- end }}
+            {{- range $secret := .Values.secrets }}
+            - name: {{ $secret.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secret.secretName }}
+                  key: {{ $secret.secretKey }}
+          {{- end }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.liveness.delay }}
+            periodSeconds: {{ .Values.liveness.timeout }}
+            failureThreshold: 10
+            httpGet:
+              path: {{ .Values.liveness.path }}
+              port: {{ .Values.ports.internal }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.readiness.delay }}
+            periodSeconds: {{ .Values.readiness.timeout }}
+            failureThreshold: 10
+            httpGet:
+              path: {{ .Values.readiness.path }}
+              port: {{ .Values.ports.internal }}
+          ports:
+            - name: {{ .Chart.Name }}
+              containerPort: {{ .Values.ports.internal }}
+          {{- if .Values.filebeat.enabled }}
+          volumeMounts:
+            - name: {{ .Chart.Name }}-logs-volume
+              mountPath: "/var/log/{{ .Values.logFolder | default .Release.Name }}/"
+        {{- end }}
+        {{- if .Values.filebeat.enabled }}
+        - name: {{ .Release.Name }}-filebeat
+          image: "{{ .Values.filebeat.image.repository }}:{{ .Values.filebeat.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            requests:
+              memory: "{{ .Values.filebeat.resources.requests.memory }}"
+              cpu: "{{ .Values.filebeat.resources.requests.cpu }}"
+            limits:
+              memory: "{{ .Values.filebeat.resources.limits.memory }}"
+              cpu: "{{ .Values.filebeat.resources.limits.cpu }}"
+          volumeMounts:
+            - name: {{ .Chart.Name }}-logs-volume
+              mountPath: "/var/log/{{ .Values.logFolder | default .Release.Name }}/"
+            - name: {{ .Chart.Name }}-config-volume
+              mountPath: /usr/share/filebeat/filebeat.yml
+              subPath: filebeat.yml
+        {{- end }}
+      volumes:
+        - name: {{ .Chart.Name }}-logs-volume
+        - name: {{ .Chart.Name }}-config-volume
+          configMap:
+            name: {{ .Release.Name }}
+            defaultMode: 420
